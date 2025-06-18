@@ -313,5 +313,4 @@ if __name__ == "__main__":
                     results.append(res)
 
     df = pd.DataFrame(results)
-    print(df.head())
     df.to_csv("ScenarioBackorderResults.csv", index=False)
