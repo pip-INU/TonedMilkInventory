@@ -3,7 +3,8 @@ import pandas as pd
 from scipy.integrate import quad
 from math import log
 from tqdm import tqdm
-
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 def safe_log(x):
     if x <= 0:
@@ -246,7 +247,14 @@ class DairySupplyChainOptimizer:
             print(f"Error in calculation: {str(e)}")
             return np.inf
 
-
+    def constraints(self, T1, T4):
+        T2 = self.solve_T2(T1)
+        T3 = self.solve_T3(T1, T4)
+        T5 = self.solve_T5(T1, T4)
+        if T1<T2<T3<T4<T5<params['T']:
+            return True
+        else :
+            return False
 if __name__ == "__main__":
     # Dummy parameter 
     n = int(input("Enter the number of retailers you have?"))
@@ -263,7 +271,7 @@ if __name__ == "__main__":
         'sigma': 0.02, 'gamma': 0.03, 'alpha': 0.01, 'beta': 0.04,
         'w_z': 0.05, 'w_f': 0.07, 'w_ri':  np.clip(np.random.normal(0.03, 0.005, size=n), 0.01, 0.05),  # individual retailer waste factors list
 
-        # Cost parameters (INR per unit or per operation)
+        # Cost parameters (in Rs.)
         'CP': 35,        # procurement cost per liter
         'c_p': 4,        # processing cost per liter
         'c_r': 6,        # reprocessing cost per liter
@@ -274,22 +282,19 @@ if __name__ == "__main__":
         'c_t': 10,       # transportation cost per trip
         'c': 1.5,        # cost per vehicle
         'c_pack': 2,     # packaging cost per liter of final product
-
-        # Setup Costs (Fixed Costs)
+        #Fixed cost
         'setup_p': 1000, # processing plant setup
         'setup_w': 800,  # waste processing unit setup
         'setup_cs': 500, # cold storage unit setup
-
         # Revenue rates
         'sp': 55,        # selling price per liter serviceable milk
         'sp_re': 40,     # resale price per liter of returned milk
         'omega': 0.85,   # fraction of resale returns
         'r_f': 30,       # revenue per liter of fat by-product
         'r_s': 25,       # revenue per liter of solids by-product
-
-        # Penalty and incentive rates
-        'p_w': 15,       # penalty per liter unutilized waste
-        'p_b': 5,
+        # Penalty
+        'p_w': 15,       # penalty on unutilized waste
+        'p_b': 5,        # penalty on backorder
         # Emissions parameters
         'e_p': 0.3,      # emissions per liter production
         'e_rp': 0.6, # emissions multiplier for reprocessed milk
@@ -304,13 +309,63 @@ if __name__ == "__main__":
     }
 
     optimizer = DairySupplyChainOptimizer(params)
+    # T1 vs T4 (x constant)
+    def plot_T1_T4(x_fixed):
+        T1_vals = np.linspace(0, 12, 50)
+        T4_vals = np.linspace(12, 24, 50)
+        T1_grid, T4_grid = np.meshgrid(T1_vals, T4_vals)
+        Profit_grid = np.vectorize(lambda T1, T4: optimizer.calculate_total_profit(T1, T4, x_fixed))(T1_grid, T4_grid)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.plot_surface(T1_grid, T4_grid, Profit_grid, cmap='viridis')
+        ax.set_xlabel('T1')
+        ax.set_ylabel('T4')
+        ax.set_zlabel('Total Profit')
+        ax.set_title(f'Total Profit vs T1 and T4 (x = {x_fixed})')
+        plt.show()
+    # T4 vs x (T1 constant)
+    def plot_T4_x(T1_fixed):
+        T4_vals = np.linspace(12, 24, 50)
+        x_vals = np.linspace(2, 20, 50)
+        T4_grid, x_grid = np.meshgrid(T4_vals, x_vals)
+        Profit_grid = np.vectorize(lambda T4, x: optimizer.calculate_total_profit(T1_fixed, T4, x))(T4_grid, x_grid)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.plot_surface(T4_grid, x_grid, Profit_grid, cmap='plasma')
+        ax.set_xlabel('T4')
+        ax.set_ylabel('x')
+        ax.set_zlabel('Total Profit')
+        ax.set_title(f'Total Profit vs T4 and x (T1 = {T1_fixed})')
+        plt.show()
+
+    # T1 vs x (T4 constant)
+    def plot_T1_x(T4_fixed):
+        T1_vals = np.linspace(0, 12, 50)
+        x_vals = np.linspace(2, 20, 50)
+        T1_grid, x_grid = np.meshgrid(T1_vals, x_vals)
+        Profit_grid = np.vectorize(lambda T1, x: optimizer.calculate_total_profit(T1, T4_fixed, x))(T1_grid, x_grid)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.plot_surface(T1_grid, x_grid, Profit_grid, cmap='inferno')
+        ax.set_xlabel('T1')
+        ax.set_ylabel('x')
+        ax.set_zlabel('Total Profit')
+        ax.set_title(f'Total Profit vs T1 and x (T4 = {T4_fixed})')
+        plt.show()
+    plot_T1_T4(x_fixed=10)
+    plot_T4_x(T1_fixed=6)
+    plot_T1_x(T4_fixed=18)
     results=[]
-    for T1 in tqdm(range(0, 13)):
-        for T4 in range(12, 25):
-            for x in range(2, 21):
-                res = optimizer.calculate_total_profit(T1, T4, x)
-                if res:
-                    results.append(res)
+    for T1 in tqdm(range(0, 25)):
+        for T4 in range(0, 25):
+            for x in range(2, 30):
+                if optimizer.constraints(T1, T4) :
+                    res = optimizer.calculate_total_profit(T1, T4, x)
+                    if res:
+                        results.append(res)
 
     df = pd.DataFrame(results)
     df.to_csv("ScenarioBackorderResults.csv", index=False)
