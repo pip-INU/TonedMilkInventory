@@ -159,16 +159,13 @@ class DairySupplyChainOptimizer:
             T5 = self.solve_T5(T1, T4)
             p = self.params
     
-
             # Milk procurement and processing
             total_milk_procured = self.mu0 * (T3 - T1)
             procurement_cost = p['CP'] * total_milk_procured
             processing_cost = p['c_p'] * total_milk_procured
-
             # Reprocessing
             total_milk_to_reprocess, _ = quad(lambda t: self.I_rw0(t, T1), T1, T4)
             reprocess_cost = p['c_r'] * total_milk_to_reprocess
-
             # Holding costs for serviceable milk
             number_s1, _ = quad(lambda t: self.I_s1(t, T1), T1, T2)
             number_s2, _ = quad(lambda t: self.I_s2(t, T1), T2, T3)
@@ -177,31 +174,25 @@ class DairySupplyChainOptimizer:
             number_s5, _ = quad(lambda t: self.I_s5(t), T5, self.T)
             total_serviceable_milk_held = number_s1 + number_s2 + number_s3 + number_s4 + number_s5
             holding_cost_s = p['c_s'] * total_serviceable_milk_held
-
             # Holding costs for raw milk
             liters_r0, _ = quad(lambda t: self.I_r0(t, T1), T1, T3)
             liters_r1, _ = quad(lambda t: self.I_r1(t, T4), T3, T4)
             holding_cost_r = p['c_raw'] * (liters_r0 + liters_r1)
-
             # Holding cost for milk to rework
             numbers_to_rework, _ = quad(lambda t: self.I_rw0(t, T1), T1, T3)
             holding_cost_rw = p['c_rw'] * numbers_to_rework
-
             # Waste costs
             waste_w0, _ = quad(lambda t: self.I_w0(t, T1), T1, T3)
             waste_w1, _ = quad(lambda t: self.I_w1(t, T1, T4), T3, T4)
             waste_w2, _ = quad(lambda t: self.I_w2(t, T1, T4), T4, T5)
             total_waste = waste_w0 + waste_w1 + waste_w2
             holding_cost_w = p['c_w'] * total_waste
-
             # Transportation & vehicle costs
             transportation_cost = p['c_t'] * p['c'] * x
-
             #Fixed Cost
             setup_cost = p['setup_p'] + p['setup_w'] + p['setup_cs'] * 4
             packaging_cost = p['c_pack'] * (self.K * self.P0 * np.exp(-self.delta_2 * (T4 - T1)) +
                                         (p['eeta'] * self.R0 * np.exp(-self.delta_3 * (T5 - T4)) / p['lmbd']))
-
             # Revenues
             r_1 = p['sp'] * self.D0 * (np.exp(self.delta_1 * (T3 - T1)) + np.exp(self.delta_1 * (self.T - T5)))
             revenue_from_solids = p['w_f'] * (self.P0 * np.exp(-self.delta_2 * (T4 - T1)) +
@@ -307,15 +298,13 @@ if __name__ == "__main__":
         'emission_cap': 500,    # emission limit before penalty applies
         'credit_price': 500,    # price per emission unit over the cap
     }
-
     optimizer = DairySupplyChainOptimizer(params)
     # T1 vs T4 (x constant)
     def plot_T1_T4(x_fixed):
         T1_vals = np.linspace(0, 12, 50)
         T4_vals = np.linspace(12, 24, 50)
         T1_grid, T4_grid = np.meshgrid(T1_vals, T4_vals)
-        Profit_grid = np.vectorize(lambda T1, T4: optimizer.calculate_total_profit(T1, T4, x_fixed))(T1_grid, T4_grid)
-
+        Profit_grid = np.vectorize(lambda T1, T4: optimizer.calculate_total_profit(T1, T4, x_fixed)['TotalProfit'])(T1_grid, T4_grid)
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.plot_surface(T1_grid, T4_grid, Profit_grid, cmap='viridis')
@@ -329,8 +318,7 @@ if __name__ == "__main__":
         T4_vals = np.linspace(12, 24, 50)
         x_vals = np.linspace(2, 20, 50)
         T4_grid, x_grid = np.meshgrid(T4_vals, x_vals)
-        Profit_grid = np.vectorize(lambda T4, x: optimizer.calculate_total_profit(T1_fixed, T4, x))(T4_grid, x_grid)
-
+        Profit_grid = np.vectorize(lambda T4, x: optimizer.calculate_total_profit(T1_fixed, T4, x)['TotalProfit'])(T4_grid, x_grid)
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.plot_surface(T4_grid, x_grid, Profit_grid, cmap='plasma')
@@ -339,14 +327,12 @@ if __name__ == "__main__":
         ax.set_zlabel('Total Profit')
         ax.set_title(f'Total Profit vs T4 and x (T1 = {T1_fixed})')
         plt.show()
-
     # T1 vs x (T4 constant)
     def plot_T1_x(T4_fixed):
         T1_vals = np.linspace(0, 12, 50)
         x_vals = np.linspace(2, 20, 50)
         T1_grid, x_grid = np.meshgrid(T1_vals, x_vals)
-        Profit_grid = np.vectorize(lambda T1, x: optimizer.calculate_total_profit(T1, T4_fixed, x))(T1_grid, x_grid)
-
+        Profit_grid = np.vectorize(lambda T1, x: optimizer.calculate_total_profit(T1, T4_fixed, x)['TotalProfit'])(T1_grid, x_grid)
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.plot_surface(T1_grid, x_grid, Profit_grid, cmap='inferno')
